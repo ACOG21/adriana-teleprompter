@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mi Teleprompter</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+  body { background:#0a0a0f; color:#f2f2f5; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; min-height:100vh; }
+  header { padding:18px 16px 10px; text-align:center; }
+  header h1 { font-size:22px; letter-spacing:.5px; }
+  header p { color:#9a9aad; font-size:13px; margin-top:4px; }
+  header .howbtn { margin-top:10px; background:#23232e; color:#e8b64c; border:1px solid #e8b64c; border-radius:999px; padding:9px 18px; font-size:14px; font-weight:700; cursor:pointer; }
+  .tabs { display:flex; gap:8px; padding:12px 16px; overflow-x:auto; position:sticky; top:0; background:#0a0a0f; z-index:5; }
+  .tab { flex:1; white-space:nowrap; padding:10px 14px; border-radius:999px; border:1px solid #2a2a35; background:#14141c; color:#cfcfe0; font-size:14px; cursor:pointer; }
+  .tab.active { background:#e8b64c; border-color:#e8b64c; color:#14141c; font-weight:700; }
+  .list { padding:4px 16px 40px; max-width:720px; margin:0 auto; }
+  .card { background:#14141c; border:1px solid #23232e; border-radius:14px; padding:16px; margin-bottom:12px; }
+  .card .meta { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
+  .pill { font-size:11px; padding:4px 10px; border-radius:999px; background:#23232e; color:#b9b9cf; }
+  .pill.gold { background:#e8b64c; color:#14141c; font-weight:700; }
+  .card h3 { font-size:17px; margin-bottom:6px; }
+  .card .hook { color:#e8b64c; font-size:14px; font-style:italic; margin-bottom:8px; }
+  .card .notes { color:#9a9aad; font-size:12.5px; margin-bottom:12px; line-height:1.5; }
+  .card .actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .btn { flex:1 1 30%; padding:12px 8px; border-radius:10px; border:none; font-size:14px; font-weight:700; cursor:pointer; }
+  .btn.primary { background:#e8b64c; color:#14141c; }
+  .btn.ghost { background:#23232e; color:#f2f2f5; }
+  .btn.cam { background:#2c4a63; color:#fff; }
+  .btn.danger { background:#3a1d22; color:#ff8f9a; flex:0 0 auto; padding:12px 14px; }
+  .script-full { background:#101016; border:1px solid #23232e; border-radius:10px; padding:14px; margin-top:10px; display:none; }
+  .script-full.open { display:block; }
+  .script-full h4 { color:#e8b64c; font-size:12px; letter-spacing:1px; margin:12px 0 4px; }
+  .script-full h4:first-child { margin-top:0; }
+  .script-full p { font-size:14.5px; line-height:1.65; color:#dcdce8; white-space:pre-line; }
+  .form { background:#14141c; border:1px solid #23232e; border-radius:14px; padding:16px; margin-bottom:16px; }
+  .form input, .form select, .form textarea { width:100%; background:#0e0e14; border:1px solid #2a2a35; color:#f2f2f5; border-radius:10px; padding:12px; font-size:15px; margin-bottom:10px; font-family:inherit; }
+  .form textarea { min-height:140px; resize:vertical; line-height:1.6; }
+  .form label { font-size:13px; color:#9a9aad; display:block; margin-bottom:6px; }
+  /* teleprompter clásico */
+  #prompter { position:fixed; inset:0; background:#000; z-index:50; display:none; flex-direction:column; }
+  #prompter.open { display:flex; }
+  #p-top { display:flex; align-items:center; gap:8px; padding:10px 12px; background:rgba(20,20,28,.95); border-bottom:1px solid #23232e; flex-wrap:wrap; }
+  #p-title { flex:1 1 100%; font-size:14px; color:#e8b64c; font-weight:700; margin-bottom:2px; }
+  .pbtn { background:#23232e; color:#fff; border:none; border-radius:8px; padding:9px 13px; font-size:14px; font-weight:700; cursor:pointer; }
+  .pbtn.on { background:#e8b64c; color:#14141c; }
+  #p-speed { display:flex; align-items:center; gap:8px; color:#9a9aad; font-size:12px; }
+  #p-speed input { width:110px; accent-color:#e8b64c; }
+  #p-scroll { flex:1; overflow-y:auto; position:relative; padding:45vh 24px 55vh; }
+  #p-text { font-size:44px; line-height:1.55; font-weight:600; text-align:left; }
+  #p-text.mirror { transform:scaleX(-1); }
+  #p-text .seg-hook { color:#e8b64c; }
+  #p-text .seg-label { display:block; font-size:.42em; letter-spacing:2px; color:#8a8a9e; margin:1.2em 0 .3em; font-weight:700; }
+  #p-text p { margin:0 0 .9em; }
+  #guide { position:absolute; left:0; right:0; top:38%; height:120px; border-top:2px solid rgba(232,182,76,.55); border-bottom:2px solid rgba(232,182,76,.55); background:rgba(232,182,76,.06); pointer-events:none; }
+  #p-progress { height:4px; background:#23232e; }
+  #p-progress i { display:block; height:100%; width:0; background:#e8b64c; }
+  #countdown { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.85); z-index:60; }
+  #countdown span { font-size:120px; font-weight:800; color:#e8b64c; }
+  .hint { text-align:center; color:#6a6a7e; font-size:12px; padding:14px 20px 30px; line-height:1.6; }
+  /* modal guía */
+  #guide-modal { position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:80; display:none; align-items:center; justify-content:center; padding:20px; }
+  #guide-modal.open { display:flex; }
+  #guide-card { background:#14141c; border:1px solid #2a2a35; border-radius:16px; padding:22px; max-width:560px; max-height:85vh; overflow-y:auto; }
+  #guide-card h2 { font-size:19px; margin-bottom:12px; color:#e8b64c; }
+  #guide-card h3 { font-size:15px; margin:16px 0 6px; color:#fff; }
+  #guide-card p, #guide-card li { font-size:14px; line-height:1.65; color:#cfcfe0; }
+  #guide-card ol, #guide-card ul { padding-left:20px; margin-top:4px; }
+  #guide-card li { margin-bottom:6px; }
+  #guide-card .tip { background:#1c1c26; border-left:3px solid #e8b64c; padding:10px 12px; border-radius:0 8px 8px 0; margin-top:12px; font-size:13.5px; }
+  #guide-close { margin-top:18px; width:100%; padding:13px; border-radius:10px; border:none; background:#e8b64c; color:#14141c; font-size:15px; font-weight:700; cursor:pointer; }
+  /* modo cámara */
+  #camera { position:fixed; inset:0; background:#000; z-index:70; display:none; }
+  #camera.open { display:block; }
+  #cam-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  #cam-textwrap { position:absolute; top:0; left:0; right:0; max-height:42%; overflow:hidden; padding:calc(env(safe-area-inset-top, 0px) + 14px) 16px 30px;
+    background:linear-gradient(rgba(0,0,0,.72), rgba(0,0,0,0)); }
+  #cam-text { font-size:32px; line-height:1.5; font-weight:700; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.9); }
+  #cam-text .seg-hook { color:#ffd97a; }
+  #cam-text .seg-label { display:block; font-size:11px; letter-spacing:2px; color:#e8b64c; margin:14px 0 4px; }
+  #cam-text p { margin:0 0 14px; }
+  #cam-err { position:absolute; top:30%; left:20px; right:20px; background:#3a1d22; border:1px solid #7a2e38; color:#ffd9dd; border-radius:12px; padding:16px; font-size:14px; line-height:1.6; display:none; z-index:75; }
+  #cam-controls { position:absolute; bottom:0; left:0; right:0; padding:12px 12px calc(env(safe-area-inset-bottom, 0px) + 12px);
+    background:linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.85)); display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:center; }
+  .cbtn { background:rgba(35,35,46,.92); color:#fff; border:none; border-radius:10px; padding:11px 14px; font-size:14px; font-weight:700; cursor:pointer; }
+  .cbtn.rec { background:#c22734; min-width:64px; }
+  .cbtn.rec.blink { animation:blink 1s infinite; }
+  @keyframes blink { 50% { opacity:.45; } }
+  #cam-timer { color:#fff; font-size:14px; font-weight:700; min-width:52px; text-align:center; display:none; }
+  #cam-speed { display:flex; align-items:center; gap:6px; color:#cfcfe0; font-size:12px; background:rgba(35,35,46,.92); border-radius:10px; padding:8px 12px; }
+  #cam-speed input { width:90px; accent-color:#e8b64c; }
+  #cam-result { position:absolute; inset:0; background:rgba(0,0,0,.94); z-index:76; display:none; flex-direction:column; align-items:center; justify-content:center; padding:24px; gap:14px; }
+  #cam-result.open { display:flex; }
+  #cam-result video { width:100%; max-width:340px; max-height:55vh; border-radius:12px; background:#111; }
+  #cam-result .row { display:flex; gap:10px; width:100%; max-width:340px; }
+  #cam-result .note { color:#9a9aad; font-size:12.5px; text-align:center; line-height:1.6; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Mi Teleprompter</h1>
+  <p>Tus guiones listos para grabar</p>
+  <br><button class="howbtn" id="how-open">❓ Cómo grabo con esto</button>
+</header>
+
+<div class="tabs" id="tabs"></div>
+<div class="list" id="list"></div>
+<p class="hint">Toca la pantalla del teleprompter para pausar o seguir.<br>Tus guiones propios se guardan en este dispositivo.</p>
+
+<div id="guide-modal">
+  <div id="guide-card">
+    <h2>❓ Cómo grabo con esta app</h2>
+    <p>El iPhone no deja tener el teleprompter y la cámara de fotos abiertos a la vez. Tienes 3 formas de grabar leyendo tu guion:</p>
+    <h3>🎥 Opción 1 — Grabar aquí mismo (nuevo)</h3>
+    <ol>
+      <li>En cualquier guion toca <b>🎥 Cámara</b>.</li>
+      <li>Acepta el permiso de cámara y micrófono.</li>
+      <li>El texto baja en letras grandes sobre tu imagen. Toca <b>⏺</b> para grabar.</li>
+      <li>Al terminar, descarga el video a tu teléfono.</li>
+    </ol>
+    <p><b>El texto NO sale en el video final</b>, es solo tu guía para leer.</p>
+    <h3>📺 Opción 2 — Dos pantallas</h3>
+    <ol>
+      <li>Abre esta app en otro dispositivo (iPad, compu, otro teléfono).</li>
+      <li>Pon esa pantalla al lado de la cámara de tu iPhone, a la altura de tus ojos.</li>
+      <li>Toca <b>▶ Teleprompter</b>, espera el 3-2-1 y graba con tu iPhone.</li>
+    </ol>
+    <h3>📋 Opción 3 — Todo en tu iPhone</h3>
+    <ol>
+      <li>Toca <b>📋 Copiar</b> en el guion.</li>
+      <li>Pega el texto en el teleprompter de <b>CapCut</b> o en la app <b>BIGVU</b> (gratis).</li>
+      <li>Grabas mirando el texto que baja sobre la cámara.</li>
+    </ol>
+    <div class="tip"><b>Tips:</b> letra grande con A+, velocidad lenta al inicio, y mira al lente de la cámara — no al texto — para que se vea natural. Si la Opción 1 te dice que no hay permiso de cámara, abre este archivo en Safari con el botón de compartir.</div>
+    <button id="guide-close">Entendido</button>
+  </div>
+</div>
+
+<div id="prompter">
+  <div id="p-top">
+    <div id="p-title"></div>
+    <button class="pbtn" id="btn-play">⏸ Pausar</button>
+    <button class="pbtn" id="btn-restart">↺ Reiniciar</button>
+    <button class="pbtn" id="btn-font-down">A−</button>
+    <button class="pbtn" id="btn-font-up">A+</button>
+    <button class="pbtn" id="btn-mirror">🪞 Espejo</button>
+    <button class="pbtn" id="btn-close">✕ Cerrar</button>
+    <div id="p-speed"><span>Velocidad</span><input type="range" id="speed" min="20" max="260" value="95"></div>
+  </div>
+  <div id="p-progress"><i></i></div>
+  <div id="p-scroll">
+    <div id="guide"></div>
+    <div id="p-text"></div>
+  </div>
+  <div id="countdown"><span>3</span></div>
+</div>
+
+<div id="camera">
+  <video id="cam-video" playsinline muted autoplay></video>
+  <div id="cam-err"></div>
+  <div id="cam-textwrap"><div id="cam-text"></div></div>
+  <div id="cam-controls">
+    <button class="cbtn rec" id="cam-record">⏺</button>
+    <span id="cam-timer">0:00</span>
+    <button class="cbtn" id="cam-play">⏸</button>
+    <button class="cbtn" id="cam-font-down">A−</button>
+    <button class="cbtn" id="cam-font-up">A+</button>
+    <button class="cbtn" id="cam-flip">🔄</button>
+    <div id="cam-speed"><span>Vel.</span><input type="range" id="cam-speed-range" min="15" max="160" value="55"></div>
+    <button class="cbtn" id="cam-close">✕</button>
+  </div>
+  <div id="cam-result">
+    <video id="cam-playback" playsinline controls></video>
+    <div class="row">
+      <a class="btn primary" id="cam-dl" download="mi-video.mp4" style="text-decoration:none;text-align:center;">⬇ Descargar</a>
+      <button class="btn ghost" id="cam-retry">↺ Repetir</button>
+    </div>
+    <p class="note">El video se grabó limpio, sin el texto del teleprompter.<br>Descárgalo y súelo a Instagram, TikTok o CapCut.</p>
+    <button class="btn ghost" id="cam-result-close" style="max-width:340px;">Cerrar</button>
+  </div>
+</div>
+
+<script>
+const SCRIPTS = [
+{account:"inicia", title:"El vendedor que solo informa ya murió", formula:"Dato que incomoda", duration:"~35 seg",
+ hook:"El vendedor que solo informa… ya murió. Y no lo mató la IA.",
+ notes:"Plano: hablando a cámara, oficina. Texto en pantalla: EL VENDEDOR QUE SOLO INFORMA YA MURIÓ",
+ body:"Lo mató un cliente que llega más informado que tú.\n\nEl 45% de los compradores investiga con IA antes de hablar contigo.\n\nEl 67% preferiría comprar sin vendedor.\n\nPero el 69% todavía busca un humano que valide lo que la IA le dijo.\n\nLa IA da datos. El humano da confianza.\n\nTu trabajo ya no es informar. Es liderar la decisión.",
+ cta:"Comenta IA y te muestro cómo un agente de inteligencia artificial califica tus leads mientras duermes."},
+{account:"inicia", title:"El documental de Netflix", formula:"Humor sobre IA", duration:"~30 seg",
+ hook:"Preparándome para el documental de Netflix…",
+ notes:"Plano: sentada, como preparándote para una entrevista. Texto en pantalla: el título completo del documental",
+ body:"…sobre los negocios que creyeron que no necesitaban IA porque tenían ChatGPT.\n\nChatGPT responde preguntas. No hace seguimiento.\n\nNo califica leads a las 11 de la noche.\n\nNo agenda citas mientras estás cerrando una venta.\n\nLa IA no viene a reemplazarte. Viene a reemplazarte… si no la usas tú primero.",
+ cta:"Sígueme si quieres usar la IA para vender más, no para tenerle miedo."},
+{account:"inicia", title:"No contrates otro vendedor", formula:"NO hagas X, haz ESTO", duration:"~30 seg",
+ hook:"No contrates otro vendedor. Haz esto en su lugar.",
+ notes:"Plano: hablando a cámara, enérgica. Texto en pantalla: NO contrates otro vendedor",
+ body:"Un vendedor duerme. Un vendedor olvida el seguimiento. Un vendedor se va a la competencia.\n\nUn agente de IA no.\n\nResponde en segundos, califica, agenda y hace seguimiento… 24/7.\n\nNo es reemplazar a tu equipo. Es darle superpoderes.",
+ cta:"Comenta AGENTE y te enseño cómo se ve uno trabajando para un negocio real."},
+{account:"realestate", title:"El terreno de Fisher Island", formula:"Dato extremo + tú no necesitas $X", duration:"~35 seg",
+ hook:"Compraron el último terreno disponible en Fisher Island en 180 millones de dólares… e intentaron revendérselo al gobierno en 400.",
+ notes:"Plano: hablando a cámara, Brickell de fondo. Texto en pantalla: $180M → quisieron venderlo en $400M",
+ body:"El negocio se cayó y el condado terminó quitándoselo por la fuerza legal.\n\nAsí de caliente está Miami: hasta el gobierno pelea por la tierra.\n\nY mientras tanto, tú puedes entrar a preconstrucción en Brickell con un inicial fraccionado en etapas de construcción.",
+ cta:"Comenta BRICKELL y te mando los proyectos con plan de pagos."},
+{account:"realestate", title:"POV Brickell", formula:"POV aspiracional", duration:"~20 seg",
+ hook:"POV: la meta nunca fue el apartamento.",
+ notes:"Plano: caminando por Brickell, toma estética. Texto en pantalla: POV: la meta nunca fue el apartamento",
+ body:"Fue despertar en Brickell.\n\nTomar café mirando la bahía.\n\nEl lujo no es tener más.\n\nEs vivir en la casa por la que tanto trabajaste.",
+ cta:"Guarda este video si Miami es tu meta."},
+{account:"realestate", title:"El mayor error", formula:"Números en pantalla", duration:"~35 seg",
+ hook:"El mayor error es pensar que necesitas el 100% para invertir en Miami.",
+ notes:"Plano: hablando a cámara. Mostrar números como texto en pantalla",
+ body:"En preconstrucción no pagas hoy el precio de hoy.\n\nReservas con un inicial fraccionado en etapas…\n\ny mientras se construye, la zona se valoriza.\n\nYo lo veo todos los días en Brickell y Edgewater.",
+ cta:"Escríbeme y te muestro los números reales de un proyecto."},
+{account:"realestate", title:"Top 5 Brickell", formula:"Top 5 + ¿con cuál te quedarías?", duration:"~40 seg",
+ hook:"5 proyectos que van a cambiar Brickell. ¿Con cuál te quedarías?",
+ notes:"Plano: montaje con renders o fotos de cada proyecto. Texto en pantalla: nombre de cada proyecto. Completa con tu portafolio (Domus, Parkside, One Twenty…)",
+ body:"Proyecto uno: rentas cortas y bienestar.\n\nProyecto dos: amoblado, frente al parque.\n\nProyecto tres: tu oficina privada con título independiente.\n\nTe los muestro uno por uno…\n\ny al final me dices con cuál te quedarías.",
+ cta:"Comenta TOP5 y te mando la lista con detalles. Y guárdalo para tu próxima visita a Miami."},
+{account:"realestate", title:"¿Cuánto cuesta en Brickell?", formula:"Juego de adivina el precio + revelación", duration:"~30 seg",
+ hook:"¿Cuánto cuesta un apartamento así en Brickell? ¿900 mil? ¿800? ¿700?",
+ notes:"Plano: sales gallery, tour rápido de los renders. Texto en pantalla: $900K? … $800K? … $700K? … ¿y si no es ni la mitad?",
+ body:"Este está en el corazón de Brickell, de PMG, entrega 2028…\n\nY entra desde 650 mil, con el inicial fraccionado en etapas de construcción.\n\nEn preconstrucción no necesitas el 100% hoy: reservas con un inicial y la zona se valoriza mientras se construye.",
+ cta:"Comenta PRECIO y te mando los números reales de este proyecto."},
+{account:"personal", title:"La ética tarda", formula:"Historia de integridad", duration:"~35 seg",
+ hook:"Pude haberle vendido el apartamento más caro para ganar más comisión.",
+ notes:"Plano: escribiendo en una libreta, música suave de piano. Texto en pantalla: La ética tarda, pero llega",
+ body:"Pero le mostré el que de verdad le convenía.\n\nPerdí esa comisión… y gané un cliente de por vida.\n\nQue me trajo tres referidos.\n\nLa ética tarda. Pero llega a quien es justo.\n\nCada cliente mío se convierte en un builder of hope.",
+ cta:"Sígueme si crees que se puede vender sin vender el alma."},
+{account:"personal", title:"Character development", formula:"Frase gancho + confianza", duration:"~25 seg",
+ hook:"No puedes herir mis sentimientos. Publico en redes todos los días.",
+ notes:"Plano: lip-sync con seguridad, look arreglado. Texto en pantalla: el hook",
+ body:"Yo le llamo character development.\n\nCada video me hace más fuerte. Cada cero likes me enseña algo.\n\nVoy camino al millón de seguidores… y estoy documentando todo el camino.",
+ cta:"Quédate si quieres ver cómo se construye una marca desde cero."},
+{account:"personal", title:"Futuro brillante", formula:"Frase optimista", duration:"~15 seg",
+ hook:"Vete comprando unos lentes de sol…",
+ notes:"Plano: primer plano, te pones unos lentes de sol y sonríes. Texto en pantalla: Vete comprando unos lentes de sol… porque nuestro futuro se ve brillante, baby",
+ body:"…porque nuestro futuro se ve brillante, baby.",
+ cta:"Guárdalo para cuando necesites recordarlo."},
+{account:"realestate", title:"La pena de preguntar (ES)", formula:"Posicionamiento sin pushy", duration:"~30 seg",
+ hook:"Me han dicho 3 clientes esta semana: 'Adriana, me da pena preguntar esto'.",
+ notes:"Cuenta: @adriana.miami ES. Plano: hablando a cámara. Guion de Meta AI (sistema anti-caos).",
+ body:"Si te da pena preguntar por la compra más grande de tu vida, mereces a alguien que te explique bien.\n\nYo te explico como si fuera tu hermana mayor exiliada que ya pasó por eso.",
+ cta:"¿Qué es lo que más pena te da preguntar? Déjamelo en comentarios."},
+{account:"realestate", title:"Cómo una latina compra sin miedo (ES)", formula:"Real estate humanizado", duration:"~20 seg",
+ hook:"Te muestro cómo una latina exiliada compra sin miedo en Miami aunque le digan que no puede.",
+ notes:"Cuenta: @adriana.miami ES. Tabla LUN 5pm. Guion de Meta AI, filtrado por Muse (patrón No-es-X corregido a positivo).",
+ body:"Parte 1: el pre-approval no es el enemigo.",
+ cta:"Comprar en Miami da miedo si nadie te explica en tu idioma. Yo te lo traduzco sin venderte humo."},
+{account:"realestate", title:"I translate the fear (EN)", formula:"Real estate humanizado EN", duration:"~20 seg",
+ hook:"I translate the fear of buying in Miami as a Latina.",
+ notes:"Cuenta: @adriana.miami EN. Tabla MAR 5pm — mismo video del lunes, en inglés. Guion de Meta AI, filtrado por Muse (patrón No-es-X corregido a positivo).",
+ body:"Part 1: pre-approval is not the enemy.",
+ cta:"Buying in Miami is scary when no one explains it in your language. Save this."},
+{account:"inicia", title:"10 horas de vuelta (IA)", formula:"Oferta IA", duration:"~30 seg",
+ hook:"Te devuelvo 10 horas de tu semana.",
+ notes:"Cuenta: @adriana.miami IA/YAP. Guion de Meta AI, filtrado por Muse (patrón No-es-X corregido a positivo).",
+ body:"Hago un Loom de 60 segundos donde tu cliente ve su problema resuelto con IA, sin jerga.\n\nSi no te ahorra 10 horas, no me pagas.",
+ cta:"¿Quieres que lo pruebe con tu negocio? Comenta y lo vemos."},
+{account:"inicia", title:"YAP — Your American Process", formula:"Humanizar YAP", duration:"~30 seg",
+ hook:"YAP nació porque yo misma olvidaba todo.",
+ notes:"Cuenta: @adriana.miami IA/YAP. Guion de Meta AI (sistema anti-caos).",
+ body:"Hacía el evento, lloraba, y a los 3 días se me olvidaba.\n\nPor eso quiero una app que te recuerde con aroma, con frase, con VR de la Gran Sabana.\n\nPara que no se te olvide.",
+ cta:"YAP = Your American Process. Sistema para que tu negocio en EEUU no dependa de tu memoria."},
+{account:"personal", title:"Cerebro exiliado (Amavibe)", formula:"Historia + producto", duration:"~20 seg",
+ hook:"Si tu cerebro exiliado no se concentra, está en modo supervivencia.",
+ notes:"Cuenta: @adrianaortiz21. Tabla LUN 11am. Guion de Meta AI, filtrado por Muse (patrón No-es-X corregido a positivo).",
+ body:"Por eso hice Amavibe: frases que tu cerebro sí guarda.",
+ cta:"Guarda esto."},
+{account:"personal", title:"The Thinking Shelf — Gaviota", formula:"Serie libros", duration:"~20 seg",
+ hook:"The Thinking Shelf: Juan Salvador Gaviota no es de volar.",
+ notes:"Cuenta: @adrianaortiz21. Tabla MAR 8am, serie de libros. Guion de Meta AI (sistema anti-caos).",
+ body:"Es de cuestionar quién decidió que no puedes salir del grupo.",
+ cta:"THE THINKING SHELF 01/08. ¿Qué libro te enseñó a cuestionar?"},
+{account:"personal", title:"Nueve colegios", formula:"Historia sin victimismo", duration:"~30 seg",
+ hook:"Nueve colegios.",
+ notes:"Cuenta: @adrianaortiz21. Guion de Meta AI (sistema anti-caos).",
+ body:"En el último me decían 'adáptate'. Yo no quería adaptarme a faltas de respeto. Me decían intensa.\n\nHoy esa niña intensa es la que defiende a sus clientes en Miami.\n\nElegí cuestionar.",
+ cta:""},
+];
+
+const TABS = [
+  {id:"inicia", label:"INICIA"},
+  {id:"realestate", label:"Real Estate"},
+  {id:"personal", label:"Personal"},
+  {id:"mine", label:"Mis guiones"}
+];
+let activeTab = "inicia";
+
+function customScripts(){
+  try { return JSON.parse(localStorage.getItem("tp_custom")||"[]"); } catch(e){ return []; }
+}
+function saveCustom(s){ localStorage.setItem("tp_custom", JSON.stringify(s)); }
+function allScripts(){
+  return SCRIPTS.map((s,i)=>({...s, uid:"s"+i, custom:false}))
+    .concat(customScripts().map((s,i)=>({...s, uid:"c"+i, custom:true})));
+}
+function visibleScripts(){
+  if(activeTab==="mine") return allScripts().filter(s=>s.custom);
+  return allScripts().filter(s=>s.account===activeTab && !s.custom);
+}
+function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+
+function renderTabs(){
+  document.getElementById("tabs").innerHTML = TABS.map(t=>
+    `<button class="tab ${t.id===activeTab?'active':''}" data-t="${t.id}">${t.label}</button>`).join("");
+  document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{activeTab=b.dataset.t; renderTabs(); renderList();});
+}
+
+function renderList(){
+  const list = document.getElementById("list");
+  let html = "";
+  if(activeTab==="mine"){
+    html += `<div class="form">
+      <label>Agrega tu propio guion (se guarda en este dispositivo)</label>
+      <input id="f-title" placeholder="Título del guion">
+      <select id="f-account">
+        <option value="inicia">INICIA</option>
+        <option value="realestate">Real Estate</option>
+        <option value="personal">Personal</option>
+      </select>
+      <textarea id="f-text" placeholder="Escribe o pega tu guion aquí… (líneas cortas, deja líneas en blanco para pausas)"></textarea>
+      <button class="btn primary" id="f-add">＋ Guardar guion</button>
+    </div>`;
+  }
+  const items = visibleScripts();
+  if(!items.length && activeTab==="mine") html += `<p class="hint">Aún no tienes guiones propios.<br>Agrégalos arriba y úsalos en el teleprompter.</p>`;
+  html += items.map(s=>`
+    <div class="card">
+      <div class="meta">
+        <span class="pill gold">${esc(s.formula||"Guion propio")}</span>
+        ${s.duration?`<span class="pill">${esc(s.duration)}</span>`:""}
+        ${s.custom?`<span class="pill">Mío</span>`:""}
+      </div>
+      <h3>${esc(s.title)}</h3>
+      ${s.hook?`<div class="hook">“${esc(s.hook)}”</div>`:""}
+      ${s.notes?`<div class="notes">🎬 ${esc(s.notes)}</div>`:""}
+      <div class="actions">
+        <button class="btn cam" onclick="openCamera('${s.uid}')">🎥 Cámara</button>
+        <button class="btn primary" onclick="openPrompter('${s.uid}')">▶ Teleprompter</button>
+        <button class="btn ghost" onclick="toggleFull('${s.uid}')">Ver guion</button>
+        <button class="btn ghost" onclick="copyScript('${s.uid}')">📋 Copiar</button>
+        ${s.custom?`<button class="btn danger" onclick="delCustom('${s.uid}')">✕</button>`:""}
+      </div>
+      <div class="script-full" id="full-${s.uid}">
+        ${s.hook?`<h4>HOOK</h4><p>${esc(s.hook)}</p>`:""}
+        ${s.body?`<h4>CUERPO</h4><p>${esc(s.body)}</p>`:""}
+        ${s.cta?`<h4>CTA</h4><p>${esc(s.cta)}</p>`:""}
+        ${(!s.hook&&!s.body)?`<p>${esc(s.text||"")}</p>`:""}
+      </div>
+    </div>`).join("");
+  list.innerHTML = html;
+  const add = document.getElementById("f-add");
+  if(add) add.onclick = addCustom;
+}
+function toggleFull(uid){
+  const el = document.getElementById("full-"+uid);
+  el.classList.toggle("open");
+}
+function plainText(s){
+  let t = s.title + "\n\n";
+  if(s.hook) t += s.hook + "\n\n";
+  t += (s.body || s.text || "") + "\n\n";
+  if(s.cta) t += s.cta;
+  return t;
+}
+function copyScript(uid){
+  const s = allScripts().find(x=>x.uid===uid);
+  if(!s) return;
+  const done = ()=>{ const b=event.target; const o=b.textContent; b.textContent="✓ Copiado"; setTimeout(()=>b.textContent=o,1500); };
+  const txt = plainText(s);
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done).catch(()=>fallbackCopy(txt, done));
+  } else fallbackCopy(txt, done);
+}
+function fallbackCopy(txt, done){
+  const ta=document.createElement("textarea");
+  ta.value=txt; ta.style.position="fixed"; ta.style.opacity="0";
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); done(); }catch(e){}
+  document.body.removeChild(ta);
+}
+function addCustom(){
+  const title = document.getElementById("f-title").value.trim();
+  const account = document.getElementById("f-account").value;
+  const text = document.getElementById("f-text").value.trim();
+  if(!title || !text){ alert("Ponle título y texto a tu guion"); return; }
+  const arr = customScripts();
+  arr.push({account, title, text, formula:"Guion propio"});
+  saveCustom(arr); renderList();
+}
+function delCustom(uid){
+  if(!confirm("¿Borrar este guion?")) return;
+  const arr = customScripts();
+  arr.splice(parseInt(uid.slice(1)),1);
+  saveCustom(arr); renderList();
+}
+
+/* ---- guía ---- */
+document.getElementById("how-open").onclick=()=>document.getElementById("guide-modal").classList.add("open");
+document.getElementById("guide-close").onclick=()=>document.getElementById("guide-modal").classList.remove("open");
+document.getElementById("guide-modal").addEventListener("click", e=>{
+  if(e.target.id==="guide-modal") e.target.classList.remove("open");
+});
+
+/* ---- teleprompter clásico ---- */
+let playing=false, raf=null, lastT=0, fontSize=44;
+const scrollEl = document.getElementById("p-scroll");
+const textEl = document.getElementById("p-text");
+
+function openPrompter(uid){
+  const s = allScripts().find(x=>x.uid===uid);
+  if(!s) return;
+  document.getElementById("p-title").textContent = s.title;
+  let html = "";
+  if(s.hook){ html += `<span class="seg-label">HOOK</span><p class="seg-hook">${esc(s.hook)}</p>`; }
+  const body = s.body || s.text || "";
+  if(body){ html += `<span class="seg-label">GUION</span>` + body.split("\n").map(l=> l.trim()? `<p>${esc(l)}</p>` : `<p>&nbsp;</p>`).join(""); }
+  if(s.cta){ html += `<span class="seg-label">CTA</span><p>${esc(s.cta)}</p>`; }
+  textEl.innerHTML = html;
+  textEl.style.fontSize = fontSize+"px";
+  document.getElementById("prompter").classList.add("open");
+  document.body.style.overflow="hidden";
+  scrollEl.scrollTop = 0;
+  updateProgress();
+  runCountdown(()=>{ setPlaying(true); });
+}
+function closePrompter(){
+  setPlaying(false);
+  document.getElementById("prompter").classList.remove("open");
+  document.body.style.overflow="";
+}
+function setPlaying(v){
+  playing=v;
+  document.getElementById("btn-play").textContent = playing? "⏸ Pausar" : "▶ Seguir";
+  if(playing){ lastT=performance.now(); raf=requestAnimationFrame(tick); }
+  else if(raf) cancelAnimationFrame(raf);
+}
+function tick(now){
+  if(!playing) return;
+  const dt=(now-lastT)/1000; lastT=now;
+  const speed=parseInt(document.getElementById("speed").value);
+  scrollEl.scrollTop += speed*dt;
+  updateProgress();
+  if(scrollEl.scrollTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 4){ setPlaying(false); return; }
+  raf=requestAnimationFrame(tick);
+}
+function updateProgress(){
+  const max = scrollEl.scrollHeight - scrollEl.clientHeight;
+  const p = max>0 ? (scrollEl.scrollTop/max*100) : 0;
+  document.querySelector("#p-progress i").style.width = p+"%";
+}
+function runCountdown(done){
+  const cd=document.getElementById("countdown"), sp=cd.querySelector("span");
+  cd.style.display="flex";
+  let n=3; sp.textContent=n;
+  const iv=setInterval(()=>{ n--; if(n<=0){ clearInterval(iv); cd.style.display="none"; done(); } else sp.textContent=n; },700);
+}
+document.getElementById("btn-play").onclick=()=>setPlaying(!playing);
+document.getElementById("btn-restart").onclick=()=>{ scrollEl.scrollTop=0; updateProgress(); };
+document.getElementById("btn-close").onclick=closePrompter;
+document.getElementById("btn-font-up").onclick=()=>{ fontSize=Math.min(90,fontSize+4); textEl.style.fontSize=fontSize+"px"; };
+document.getElementById("btn-font-down").onclick=()=>{ fontSize=Math.max(24,fontSize-4); textEl.style.fontSize=fontSize+"px"; };
+document.getElementById("btn-mirror").onclick=function(){ textEl.classList.toggle("mirror"); this.classList.toggle("on"); };
+scrollEl.addEventListener("click", e=>{ if(e.target.closest("#p-top"))return; setPlaying(!playing); });
+scrollEl.addEventListener("scroll", updateProgress, {passive:true});
+
+/* ---- modo cámara ---- */
+let camStream=null, camRecorder=null, camChunks=[], camFacing="user";
+let camPlaying=false, camRaf=null, camLast=0, camFont=32;
+let recStart=0, recTimer=null;
+const camVideo=document.getElementById("cam-video");
+const camWrap=document.getElementById("cam-textwrap");
+const camText=document.getElementById("cam-text");
+
+function camLines(s){
+  const parts=[];
+  if(s.hook) parts.push({t:"HOOK",label:true},{t:s.hook,hook:true});
+  const body=s.body||s.text||"";
+  if(body){ parts.push({t:"GUION",label:true});
+    body.split("\n").forEach(l=>{ if(l.trim()) parts.push({t:l.trim()}); }); }
+  if(s.cta) parts.push({t:"CTA",label:true},{t:s.cta});
+  return parts;
+}
+function renderCamText(){
+  const s=camScript; if(!s) return;
+  camText.innerHTML = camLines(s).map(p=>
+    p.label? `<span class="seg-label">${esc(p.t)}</span>`
+    : p.hook? `<p class="seg-hook">${esc(p.t)}</p>`
+    : `<p>${esc(p.t)}</p>`).join("");
+  camText.style.fontSize = camFont+"px";
+  camWrap.scrollTop=0;
+}
+function showCamErr(msg){
+  const e=document.getElementById("cam-err");
+  e.style.display="block";
+  e.innerHTML=msg;
+}
+function hideCamErr(){ document.getElementById("cam-err").style.display="none"; }
+
+async function openCamera(uid){
+  const s=allScripts().find(x=>x.uid===uid);
+  if(!s) return;
+  camScript=s;
+  document.getElementById("camera").classList.add("open");
+  document.body.style.overflow="hidden";
+  document.getElementById("cam-result").classList.remove("open");
+  renderCamText();
+  setCamPlaying(false);
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    showCamErr("Este navegador no permite usar la cámara aquí.<br><br>Abre este archivo en <b>Safari</b> (botón compartir → Abrir en Safari) o usa la Opción 3 de la guía: copia el guion a CapCut o BIGVU.");
+    return;
+  }
+  try{ await startCamStream(); }
+  catch(e){
+    showCamErr("No pude acceder a la cámara.<br><br>1) Acepta el permiso de cámara y micrófono cuando el navegador lo pida.<br>2) Si no te lo pidió, abre este archivo en <b>Safari</b> con el botón de compartir.<br><br>Mientras tanto puedes usar la Opción 3: 📋 Copiar el guion a CapCut o BIGVU.");
+  }
+}
+async function startCamStream(){
+  if(camStream) camStream.getTracks().forEach(t=>t.stop());
+  camStream=await navigator.mediaDevices.getUserMedia({
+    video:{facingMode:camFacing, width:{ideal:1280}, height:{ideal:1920}},
+    audio:true
+  });
+  camVideo.srcObject=camStream;
+  try{ await camVideo.play(); }catch(e){}
+  hideCamErr();
+}
+function closeCamera(){
+  stopRecTimer();
+  if(camRecorder && camRecorder.state==="recording"){ try{camRecorder.stop();}catch(e){} }
+  setCamPlaying(false);
+  if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+  document.getElementById("camera").classList.remove("open");
+  document.body.style.overflow="";
+}
+function setCamPlaying(v){
+  camPlaying=v;
+  document.getElementById("cam-play").textContent = camPlaying? "⏸" : "▶";
+  if(camPlaying){ camLast=performance.now(); camRaf=requestAnimationFrame(camTick); }
+  else if(camRaf) cancelAnimationFrame(camRaf);
+}
+function camTick(now){
+  if(!camPlaying) return;
+  const dt=(now-camLast)/1000; camLast=now;
+  const speed=parseInt(document.getElementById("cam-speed-range").value);
+  camWrap.scrollTop += speed*dt;
+  if(camWrap.scrollTop + camWrap.clientHeight >= camWrap.scrollHeight - 4){ setCamPlaying(false); return; }
+  camRaf=requestAnimationFrame(camTick);
+}
+function fmtT(s){ return Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0"); }
+function startRecTimer(){
+  recStart=Date.now();
+  const t=document.getElementById("cam-timer");
+  t.style.display="block"; t.textContent="0:00";
+  recTimer=setInterval(()=>{ t.textContent=fmtT((Date.now()-recStart)/1000); },500);
+}
+function stopRecTimer(){
+  if(recTimer) clearInterval(recTimer); recTimer=null;
+  document.getElementById("cam-timer").style.display="none";
+  document.getElementById("cam-record").classList.remove("blink");
+}
+function toggleRecord(){
+  if(!camStream){ showCamErr("Primero necesito acceso a la cámara para grabar."); return; }
+  if(camRecorder && camRecorder.state==="recording"){ camRecorder.stop(); return; }
+  camChunks=[];
+  let mime="";
+  if(window.MediaRecorder){
+    if(MediaRecorder.isTypeSupported("video/mp4")) mime="video/mp4";
+    else if(MediaRecorder.isTypeSupported("video/webm")) mime="video/webm";
+  } else { showCamErr("Este navegador no puede grabar video. Usa Safari o la Opción 3 (CapCut/BIGVU)."); return; }
+  try{
+    camRecorder=new MediaRecorder(camStream, mime?{mimeType:mime, videoBitsPerSecond:8000000}:undefined);
+  }catch(e){ showCamErr("No se pudo iniciar la grabación en este navegador. Prueba en Safari."); return; }
+  camRecorder.ondataavailable=e=>{ if(e.data && e.data.size) camChunks.push(e.data); };
+  camRecorder.onstop=showCamResult;
+  camRecorder.start(500);
+  document.getElementById("cam-record").classList.add("blink");
+  document.getElementById("cam-record").textContent="⏹";
+  startRecTimer();
+  if(!camPlaying) setCamPlaying(true);
+}
+function showCamResult(){
+  stopRecTimer();
+  document.getElementById("cam-record").classList.remove("blink");
+  document.getElementById("cam-record").textContent="⏺";
+  const type=(camRecorder && camRecorder.mimeType)||"video/mp4";
+  const blob=new Blob(camChunks,{type});
+  const url=URL.createObjectURL(blob);
+  const ext=type.includes("webm")?"webm":"mp4";
+  const pv=document.getElementById("cam-playback");
+  pv.src=url;
+  const dl=document.getElementById("cam-dl");
+  dl.href=url; dl.download="mi-video."+ext;
+  document.getElementById("cam-result").classList.add("open");
+}
+document.getElementById("cam-record").onclick=toggleRecord;
+document.getElementById("cam-play").onclick=()=>setCamPlaying(!camPlaying);
+document.getElementById("cam-close").onclick=closeCamera;
+document.getElementById("cam-font-up").onclick=()=>{ camFont=Math.min(64,camFont+3); camText.style.fontSize=camFont+"px"; };
+document.getElementById("cam-font-down").onclick=()=>{ camFont=Math.max(20,camFont-3); camText.style.fontSize=camFont+"px"; };
+document.getElementById("cam-flip").onclick=async()=>{
+  if(camRecorder && camRecorder.state==="recording"){ alert("Detén la grabación antes de cambiar de cámara"); return; }
+  camFacing = camFacing==="user" ? "environment" : "user";
+  try{ await startCamStream(); }catch(e){ showCamErr("No pude cambiar de cámara."); }
+};
+document.getElementById("cam-retry").onclick=()=>{
+  document.getElementById("cam-result").classList.remove("open");
+  camWrap.scrollTop=0; setCamPlaying(false);
+};
+document.getElementById("cam-result-close").onclick=()=>{
+  document.getElementById("cam-result").classList.remove("open");
+};
+camWrap.addEventListener("click", ()=>setCamPlaying(!camPlaying));
+
+renderTabs(); renderList();
+</script>
+</body>
+</html>
